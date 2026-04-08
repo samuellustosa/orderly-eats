@@ -20,6 +20,22 @@ class ApiClient {
     return this.token;
   }
 
+  /**
+   * Métodos genéricos para o AuthContext e outras chamadas manuais
+   */
+  public async post<T = any>(path: string, data: any): Promise<{ data: T }> {
+    const response = await this.request<T>(path, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return { data: response };
+  }
+
+  public async get<T = any>(path: string): Promise<{ data: T }> {
+    const response = await this.request<T>(path, { method: 'GET' });
+    return { data: response };
+  }
+
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string> || {}),
@@ -29,7 +45,6 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    // Don't set Content-Type for FormData
     if (!(options.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
@@ -41,31 +56,44 @@ class ApiClient {
 
     if (response.status === 401) {
       this.setToken(null);
-      window.location.href = '/login';
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
       throw new Error('Sessão expirada. Faça login novamente.');
     }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
-      throw new Error(error.message || `Erro ${response.status}`);
+      // Pega a mensagem de erro do Zod ou a mensagem padrão do servidor
+      const msg = error.errors ? Object.values(error.errors).flat()[0] : error.message;
+      throw new Error(msg || `Erro ${response.status}`);
     }
 
     if (response.status === 204) return {} as T;
     return response.json();
   }
 
-  // Auth
+  /**
+   * AUTENTICAÇÃO
+   * Aqui fazemos a "mágica": o front recebe email, mas manda 'phone' para o backend
+   */
   signup(data: { email: string; password: string }) {
     return this.request<{ token: string }>('/signup', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        phone: data.email, // Tradução para o campo esperado pelo seu backend
+        password: data.password
+      }),
     });
   }
 
   login(data: { email: string; password: string }) {
     return this.request<{ token: string }>('/login', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        phone: data.email, // O seu backend no login.ts espera 'phone'
+        password: data.password
+      }),
     });
   }
 
@@ -76,7 +104,9 @@ class ApiClient {
     });
   }
 
-  // Products
+  /**
+   * PRODUTOS
+   */
   getProducts() {
     return this.request<Product[]>('/products');
   }
@@ -115,7 +145,9 @@ class ApiClient {
     });
   }
 
-  // Categories
+  /**
+   * CATEGORIAS E PEDIDOS
+   */
   createCategory(data: { name: string }) {
     return this.request<Category>('/categories', {
       method: 'POST',
@@ -123,7 +155,6 @@ class ApiClient {
     });
   }
 
-  // Orders
   getOrders() {
     return this.request<Order[]>('/orders');
   }
@@ -135,7 +166,9 @@ class ApiClient {
     });
   }
 
-  // Public Menu
+  /**
+   * MENU PÚBLICO
+   */
   getMenu(slug: string) {
     return this.request<MenuData>(`/menu/${slug}`);
   }
@@ -150,7 +183,8 @@ class ApiClient {
 
 export const api = new ApiClient();
 
-// Types
+// --- DEFINIÇÕES DE TIPOS ---
+
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 export interface Product {

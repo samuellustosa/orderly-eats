@@ -3,26 +3,47 @@ import { api } from '@/lib/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
+  signup: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!api.getToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('auth_token');
+  });
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { token } = await api.login({ email, password });
-    api.setToken(token);
-    setIsAuthenticated(true);
+  const login = useCallback(async (identifier: string, password: string) => {
+    try {
+      // Passamos o tipo <{ token: string }> para o TS saber que o token existe
+      const response = await api.post<{ token: string }>('/login', { 
+        phone: identifier, 
+        password 
+      });
+
+      const { token } = response.data;
+      api.setToken(token); // Usa o método da classe para salvar como 'auth_token'
+      setIsAuthenticated(true);
+    } catch (error: any) {
+      throw new Error(error.message || 'Erro ao realizar login');
+    }
   }, []);
 
-  const signup = useCallback(async (email: string, password: string) => {
-    const { token } = await api.signup({ email, password });
-    api.setToken(token);
-    setIsAuthenticated(true);
+  const signup = useCallback(async (identifier: string, password: string) => {
+    try {
+      const response = await api.post<{ token: string }>('/signup', { 
+        phone: identifier, 
+        password 
+      });
+
+      const { token } = response.data;
+      api.setToken(token);
+      setIsAuthenticated(true);
+    } catch (error: any) {
+      throw new Error(error.message || 'Erro ao criar conta');
+    }
   }, []);
 
   const logout = useCallback(() => {
