@@ -71,4 +71,12 @@
   .gradient-success {
     background: linear-gradient(135deg, hsl(145 60% 42%), hsl(155 55% 48%));
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
